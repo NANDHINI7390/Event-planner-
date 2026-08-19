@@ -1,0 +1,7 @@
+{
+  "name": "The Arboretum @ ECR",
+  "description": "Cinematic luxury wedding & events experience with integrated Backstage CRM, interactive lookbook, and real-time quotation builder.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

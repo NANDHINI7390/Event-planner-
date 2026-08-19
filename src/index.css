@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: "Cormorant Garamond", Georgia, serif;
+    --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+    --font-script: "Alex Brush", cursive;
+    
+    --color-ivory: #FAF8F5;
+    --color-ivory-light: #FFFFFF;
+    --color-stone: #EAE5DC;
+    --color-stone-muted: #D8D1C5;
+    --color-royal-navy: #0C1929;
+    --color-royal-deep: #07101C;
+    --color-royal-soft: #14283F;
+    --color-gold: #C5A059;
+    --color-gold-light: #E6CA85;
+    --color-gold-dark: #9A7732;
+    --color-terracotta: #BA6B53;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--color-ivory);
+    color: #0C1929;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: var(--font-serif);
+  }
+
+  .font-script {
+    font-family: var(--font-script);
+  }
+}
+
+/* Custom Ken Burns animations */
+@keyframes kenburns-slow {
+  0% {
+    transform: scale(1) translate(0, 0);
+  }
+  50% {
+    transform: scale(1.08) translate(-1%, -1%);
+  }
+  100% {
+    transform: scale(1.14) translate(1%, 0%);
+  }
+}
+
+.animate-ken-burns {
+  animation: kenburns-slow 24s ease-in-out infinite alternate;
+}
+
+/* Custom scrollbar for luxury editorial experience */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF8F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D8D1C5;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #C5A059;
+}
+
+/* Glass and gold foil effects */
+.gold-foil-border {
+  border-image: linear-gradient(to bottom right, #E6CA85, #C5A059, #9A7732) 1;
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #0C1929 0%, #C5A059 50%, #0C1929 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-shimmer {
+  background: linear-gradient(90deg, #FAF8F5 0%, #F5EFEB 50%, #FAF8F5 100%);
+}
+
+/* Print styles for quotation export */
+@media print {
+  body {
+    background: #FFFFFF !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}

@@ -1,293 +1,359 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
 import { 
   Plus, 
   Search, 
   Filter, 
-  MoreVertical, 
+  Calendar, 
+  Users, 
   Phone, 
   Mail, 
-  Calendar, 
-  Clock, 
-  DollarSign, 
   ArrowRight, 
+  Clock, 
   CheckCircle2, 
-  UserCheck, 
-  FileText,
-  User,
-  MessageSquare,
-  Sparkles
+  FileText, 
+  User, 
+  MessageSquare, 
+  Sparkles, 
+  Download,
+  ChevronRight,
+  SlidersHorizontal
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Lead, LeadStatus, EventCategory } from '../../types';
 
-interface KanbanColumnConfig {
-  id: LeadStatus;
-  title: string;
-  badgeColor: string;
-  bgColor: string;
-}
-
-const KANBAN_COLUMNS: KanbanColumnConfig[] = [
-  { id: 'new', title: 'New Enquiries', badgeColor: 'bg-amber-100 text-amber-900 border-amber-300', bgColor: 'bg-amber-50/40' },
-  { id: 'contacted', title: 'Contacted', badgeColor: 'bg-blue-100 text-blue-900 border-blue-300', bgColor: 'bg-blue-50/40' },
-  { id: 'visit_scheduled', title: 'Venue Walk-Through', badgeColor: 'bg-purple-100 text-purple-900 border-purple-300', bgColor: 'bg-purple-50/40' },
-  { id: 'quotation_sent', title: 'Quotation Sent', badgeColor: 'bg-indigo-100 text-indigo-900 border-indigo-300', bgColor: 'bg-indigo-50/40' },
-  { id: 'negotiation', title: 'Negotiation / Tasting', badgeColor: 'bg-rose-100 text-rose-900 border-rose-300', bgColor: 'bg-rose-50/40' },
-  { id: 'confirmed', title: 'Confirmed Booking', badgeColor: 'bg-emerald-100 text-emerald-900 border-emerald-300', bgColor: 'bg-emerald-50/40' },
-  { id: 'completed', title: 'Completed Celebrations', badgeColor: 'bg-stone-200 text-stone-900 border-stone-300', bgColor: 'bg-stone-50/40' },
-  { id: 'lost', title: 'Archived / Lost', badgeColor: 'bg-red-100 text-red-900 border-red-300', bgColor: 'bg-red-50/40' }
+const STAGES: { id: LeadStatus; label: string; color: string; badgeBg: string }[] = [
+  { id: 'new', label: 'New Enquiries', color: 'border-amber-400', badgeBg: 'bg-amber-100 text-amber-900' },
+  { id: 'contacted', label: 'Contacted', color: 'border-blue-400', badgeBg: 'bg-blue-100 text-blue-900' },
+  { id: 'visit_scheduled', label: 'Site Visit', color: 'border-purple-400', badgeBg: 'bg-purple-100 text-purple-900' },
+  { id: 'quotation_sent', label: 'Quotation Sent', color: 'border-indigo-400', badgeBg: 'bg-indigo-100 text-indigo-900' },
+  { id: 'negotiation', label: 'Tasting & Review', color: 'border-orange-400', badgeBg: 'bg-orange-100 text-orange-900' },
+  { id: 'confirmed', label: 'Confirmed Booking', color: 'border-emerald-500', badgeBg: 'bg-emerald-100 text-emerald-900' },
+  { id: 'completed', label: 'Completed', color: 'border-stone-400', badgeBg: 'bg-stone-100 text-stone-900' },
+  { id: 'lost', label: 'Archived / Lost', color: 'border-red-400', badgeBg: 'bg-red-100 text-red-900' }
 ];
 
-export const LeadKanban: React.FC<{
+export const LeadKanban: React.FC<{ 
+  onSelectLead: (lead: Lead) => void;
   onNewLeadClick: () => void;
-  onLeadClick: (lead: Lead) => void;
-}> = ({ onNewLeadClick, onLeadClick }) => {
-  const { 
-    leads, 
-    updateLeadStatus, 
-    setSelectedLeadForQuotation, 
-    setAdminTab,
-    openCommunicationModal
-  } = useApp();
+  onCommunicationClick: (lead: Lead) => void;
+}> = ({ onSelectLead, onNewLeadClick, onCommunicationClick }) => {
+  const { leads, updateLeadStatus } = useApp();
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterStaff, setFilterStaff] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEventType, setSelectedEventType] = useState<string>('all');
+  const [selectedStaff, setSelectedStaff] = useState<string>('all');
+  const [activeMobileStage, setActiveMobileStage] = useState<LeadStatus>('new');
 
-  // Filtered Leads
-  const filteredLeads = leads.filter(l => {
+  const filteredLeads = leads.filter(lead => {
     const matchesSearch = 
-      l.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      l.phone.includes(searchQuery) ||
-      (l.partnerName && l.partnerName.toLowerCase().includes(searchQuery.toLowerCase()));
+      lead.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lead.partnerName && lead.partnerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      lead.phone.includes(searchTerm) ||
+      lead.email.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesType = filterType === 'all' || l.eventType === filterType;
-    const matchesStaff = filterStaff === 'all' || (l.assignedStaff && l.assignedStaff.includes(filterStaff));
+    const matchesType = selectedEventType === 'all' || lead.eventType === selectedEventType;
+    const matchesStaff = selectedStaff === 'all' || lead.assignedStaff === selectedStaff;
 
     return matchesSearch && matchesType && matchesStaff;
   });
 
-  const getLeadsByStatus = (status: LeadStatus) => {
-    return filteredLeads.filter(l => l.status === status);
+  const getLeadsByStage = (stage: LeadStatus) => {
+    return filteredLeads.filter(lead => lead.status === stage);
   };
 
-  const handleQuickWhatsApp = (lead: Lead, e: React.MouseEvent) => {
+  const handleNextStage = (e: React.MouseEvent, lead: Lead) => {
     e.stopPropagation();
-    openCommunicationModal({
-      recipientName: lead.clientName,
-      recipientPhone: lead.phone,
-      recipientEmail: lead.email,
-      leadId: lead.id,
-      defaultTemplate: 'visit_confirm'
-    });
+    const currentIndex = STAGES.findIndex(s => s.id === lead.status);
+    if (currentIndex < STAGES.length - 2) {
+      const nextStage = STAGES[currentIndex + 1].id;
+      updateLeadStatus(lead.id, nextStage);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['Client Name', 'Partner Name', 'Phone', 'Email', 'Event Type', 'Event Date', 'Guest Count', 'Status', 'Estimated Budget', 'Assigned Staff', 'Created At'];
+    const rows = filteredLeads.map(l => [
+      `"${l.clientName || ''}"`,
+      `"${l.partnerName || ''}"`,
+      `"${l.phone || ''}"`,
+      `"${l.email || ''}"`,
+      `"${l.eventType || ''}"`,
+      `"${l.eventDate || ''}"`,
+      `"${l.guestCount || ''}"`,
+      `"${l.status || ''}"`,
+      `"₹${(l.quotationAmount || 2500000).toLocaleString('en-IN')}"`,
+      `"${l.assignedStaff || ''}"`,
+      `"${l.createdAt || ''}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `arboretum_enquiries_export_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
-    <div className="space-y-6 max-w-full">
+    <div className="space-y-4 sm:space-y-6 max-w-full p-3 sm:p-6 lg:p-8">
       
-      {/* Top Filter & Action Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-3xl border border-stone-200 shadow-xs">
+      {/* Control Strip */}
+      <div className="bg-white p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         
-        {/* Search Input */}
-        <div className="flex-1 relative max-w-md">
+        {/* Search */}
+        <div className="relative flex-1 min-w-0">
           <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search leads by client name, partner or phone..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#FAF8F5] border border-stone-300 text-xs focus:ring-2 focus:ring-[#0C1929] focus:outline-hidden text-[#0C1929]"
+            placeholder="Search by client name, partner, phone, email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 bg-stone-50 border border-stone-200 rounded-xl text-xs focus:outline-hidden focus:border-[#C5A059] text-stone-800"
           />
         </div>
 
-        {/* Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Filters and Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          
           <select
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-[#FAF8F5] border border-stone-300 text-xs text-[#0C1929] font-medium focus:ring-2 focus:ring-[#0C1929] focus:outline-hidden"
+            value={selectedEventType}
+            onChange={(e) => setSelectedEventType(e.target.value)}
+            className="bg-stone-50 border border-stone-200 text-stone-700 text-xs rounded-xl px-3 py-2 focus:outline-hidden cursor-pointer"
           >
-            <option value="all">All Celebration Types</option>
+            <option value="all">All Celebrations</option>
             <option value="wedding">Weddings</option>
             <option value="reception">Receptions</option>
-            <option value="sangeet">Sangeet / Mehendi</option>
-            <option value="engagement">Engagements</option>
+            <option value="pre_wedding">Sangeet / Mehendi</option>
             <option value="corporate">Corporate Galas</option>
+            <option value="private_celebration">Private Gatherings</option>
           </select>
 
           <select
-            value={filterStaff}
-            onChange={(e) => setFilterStaff(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-[#FAF8F5] border border-stone-300 text-xs text-[#0C1929] font-medium focus:ring-2 focus:ring-[#0C1929] focus:outline-hidden"
+            value={selectedStaff}
+            onChange={(e) => setSelectedStaff(e.target.value)}
+            className="bg-stone-50 border border-stone-200 text-stone-700 text-xs rounded-xl px-3 py-2 focus:outline-hidden cursor-pointer"
           >
-            <option value="all">All Assigned Directors</option>
-            <option value="Vikram">Vikram Sundaram</option>
-            <option value="Pooja">Pooja Iyer</option>
-            <option value="Ramesh">Ramesh K.</option>
-            <option value="Ananya">Ananya Nair</option>
+            <option value="all">All Directors</option>
+            <option value="Vikram Sundaram">Vikram Sundaram</option>
+            <option value="Ananya Nair">Ananya Nair</option>
+            <option value="Rahul Menon">Rahul Menon</option>
           </select>
 
           <button
+            onClick={handleExportCSV}
+            title="Export enquiries to CSV"
+            className="px-3 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-semibold tracking-wider transition-colors flex items-center gap-1.5 border border-stone-300 active:scale-95"
+          >
+            <Download className="w-3.5 h-3.5 text-stone-600" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+
+          <button
             onClick={onNewLeadClick}
-            className="px-4 py-2 rounded-xl bg-[#0C1929] hover:bg-stone-900 text-white text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-xs"
+            className="px-3.5 py-2 rounded-xl bg-[#0C1929] hover:bg-stone-900 text-white text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-1.5 shadow-xs active:scale-95"
           >
             <Plus className="w-3.5 h-3.5 text-[#C5A059]" />
-            <span>New Lead</span>
+            <span>Add Lead</span>
           </button>
-        </div>
 
+        </div>
       </div>
 
-      {/* Horizontal Scrolling Kanban Stages Board */}
-      <div className="flex gap-4 overflow-x-auto pb-6 pt-1">
-        {KANBAN_COLUMNS.map((col) => {
-          const colLeads = getLeadsByStatus(col.id);
-
+      {/* Mobile Stage Selector Tabs (Shown on small screens) */}
+      <div className="flex lg:hidden overflow-x-auto scrollbar-none gap-1.5 pb-2 -mx-1 px-1">
+        {STAGES.map(stage => {
+          const count = getLeadsByStage(stage.id).length;
+          const isActive = activeMobileStage === stage.id;
           return (
-            <div
-              key={col.id}
-              className={`w-80 shrink-0 rounded-3xl border border-stone-200 ${col.bgColor} flex flex-col max-h-[calc(100vh-220px)] shadow-xs`}
+            <button
+              key={stage.id}
+              onClick={() => setActiveMobileStage(stage.id)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap flex items-center gap-1.5 transition-all ${
+                isActive
+                  ? 'bg-[#0C1929] text-[#E6CA85] shadow-xs'
+                  : 'bg-white text-stone-600 border border-stone-200'
+              }`}
             >
-              {/* Column Header */}
-              <div className="p-3.5 border-b border-stone-200 bg-white rounded-t-3xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border uppercase tracking-wider ${col.badgeColor}`}>
-                    {colLeads.length}
-                  </span>
-                  <h4 className="font-serif text-sm font-bold text-[#0C1929]">
-                    {col.title}
-                  </h4>
-                </div>
+              <span>{stage.label}</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isActive ? 'bg-[#C5A059] text-[#0C1929] font-bold' : 'bg-stone-100 text-stone-600'}`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Mobile Single Stage View (lg:hidden) */}
+      <div className="block lg:hidden">
+        {STAGES.filter(s => s.id === activeMobileStage).map(stage => {
+          const stageLeads = getLeadsByStage(stage.id);
+          return (
+            <div key={stage.id} className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-stone-100">
+                <h3 className="font-serif text-base font-bold text-[#0C1929]">{stage.label}</h3>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold ${stage.badgeBg}`}>
+                  {stageLeads.length} Enquiries
+                </span>
               </div>
 
-              {/* Lead Cards List */}
-              <div className="p-3 space-y-3 overflow-y-auto flex-1">
-                {colLeads.map((lead) => (
-                  <motion.div
-                    key={lead.id}
-                    layout
-                    onClick={() => onLeadClick(lead)}
-                    className="p-4 rounded-2xl bg-white border border-stone-200 hover:border-[#0C1929] shadow-2xs hover:shadow-md transition-all cursor-pointer space-y-3"
-                  >
-                    {/* Lead Card Header */}
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h5 className="font-bold text-sm text-[#0C1929] hover:text-[#9A7732] transition-colors">
-                          {lead.clientName}
-                        </h5>
-                        {lead.partnerName && (
-                          <span className="text-xs text-stone-700 font-serif italic block">
-                            &amp; {lead.partnerName}
+              {stageLeads.length === 0 ? (
+                <div className="text-center py-8 text-xs text-stone-400">
+                  No enquiries currently in this stage.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {stageLeads.map(lead => (
+                    <div
+                      key={lead.id}
+                      onClick={() => onSelectLead(lead)}
+                      className="bg-stone-50 hover:bg-stone-100 p-4 rounded-xl border border-stone-200 shadow-xs cursor-pointer space-y-2.5 transition-all"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-serif text-sm font-bold text-[#0C1929]">
+                            {lead.clientName} {lead.partnerName ? `& ${lead.partnerName}` : ''}
+                          </h4>
+                          <span className="text-[11px] text-stone-500 block">
+                            {lead.eventType} · {lead.eventDate}
                           </span>
-                        )}
-                      </div>
-
-                      <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-stone-100 text-stone-800">
-                        {lead.eventType}
-                      </span>
-                    </div>
-
-                    {/* Key Details */}
-                    <div className="text-xs text-stone-700 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5 text-[#9A7732]" />
-                        <span className="font-medium">{lead.eventDate} ({lead.guestCount} pax)</span>
-                      </div>
-
-                      {lead.visitDate && (
-                        <div className="flex items-center gap-2 text-purple-900 font-semibold">
-                          <Clock className="w-3.5 h-3.5" />
-                          <span>Tour: {lead.visitDate}</span>
                         </div>
-                      )}
-
-                      {lead.quotationAmount && (
-                        <div className="flex items-center gap-1.5 font-bold text-emerald-800">
-                          <span>₹{(lead.quotationAmount / 100000).toFixed(2)} Lakhs Quote</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Assigned Staff & Actions footer */}
-                    <div className="pt-2.5 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-700">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={(e) => handleQuickWhatsApp(lead, e)}
-                          className="p-1 rounded-md text-emerald-700 hover:bg-emerald-50 transition-colors"
-                          title="WhatsApp Client"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="truncate max-w-[100px] font-medium">
-                          {lead.assignedStaff?.split(' ')[0] || 'Director'}
+                        <span className="font-mono text-xs font-bold text-[#9A7732]">
+                          ₹{((lead.quotationAmount || 2500000) / 100000).toFixed(1)}L
                         </span>
                       </div>
 
-                      {/* Quick stage advance buttons */}
-                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                        {col.id === 'new' && (
+                      <div className="flex items-center justify-between pt-2 border-t border-stone-200 text-xs">
+                        <span className="text-[11px] text-stone-600 font-medium">
+                          👤 {lead.assignedStaff}
+                        </span>
+                        <div className="flex items-center gap-2">
                           <button
-                            onClick={() => updateLeadStatus(lead.id, 'contacted')}
-                            className="px-2 py-0.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 text-[10px] font-bold"
-                            title="Mark as Contacted"
-                          >
-                            Contact →
-                          </button>
-                        )}
-
-                        {col.id === 'contacted' && (
-                          <button
-                            onClick={() => updateLeadStatus(lead.id, 'visit_scheduled')}
-                            className="px-2 py-0.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 text-[10px] font-bold"
-                            title="Schedule Walk-Through"
-                          >
-                            Visit →
-                          </button>
-                        )}
-
-                        {(col.id === 'visit_scheduled' || col.id === 'contacted') && (
-                          <button
-                            onClick={() => {
-                              setSelectedLeadForQuotation(lead);
-                              setAdminTab('quotes');
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCommunicationClick(lead);
                             }}
-                            className="px-2 py-0.5 rounded-lg bg-[#0C1929] text-white hover:bg-stone-900 text-[10px] font-bold"
-                            title="Open Quotation Builder"
+                            className="p-1.5 bg-emerald-100 text-emerald-800 rounded-lg"
+                            title="WhatsApp / Message"
                           >
-                            Quote
+                            <MessageSquare className="w-3.5 h-3.5" />
                           </button>
-                        )}
-
-                        {col.id === 'quotation_sent' && (
                           <button
-                            onClick={() => updateLeadStatus(lead.id, 'negotiation')}
-                            className="px-2 py-0.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-900 text-[10px] font-bold"
+                            type="button"
+                            onClick={(e) => handleNextStage(e, lead)}
+                            className="px-2.5 py-1 bg-[#0C1929] text-white rounded-lg text-[11px] font-semibold flex items-center gap-1"
                           >
-                            Negotiate →
+                            <span>Next</span>
+                            <ChevronRight className="w-3 h-3 text-[#C5A059]" />
                           </button>
-                        )}
-
-                        {col.id === 'negotiation' && (
-                          <button
-                            onClick={() => updateLeadStatus(lead.id, 'confirmed')}
-                            className="px-2 py-0.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-bold"
-                          >
-                            Confirm ✓
-                          </button>
-                        )}
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-                  </motion.div>
-                ))}
+      {/* Desktop Multi-Column Kanban Board (Hidden on mobile) */}
+      <div className="hidden lg:grid grid-cols-4 xl:grid-cols-8 gap-3 overflow-x-auto pb-4">
+        {STAGES.map((stage) => {
+          const stageLeads = getLeadsByStage(stage.id);
 
-                {colLeads.length === 0 && (
-                  <div className="py-8 text-center text-xs text-stone-700 font-light italic">
-                    No leads in this stage
+          return (
+            <div
+              key={stage.id}
+              className="bg-[#FAF8F5] rounded-2xl border border-stone-200 p-3 flex flex-col min-w-[240px] xl:min-w-0"
+            >
+              
+              {/* Column Header */}
+              <div className={`border-t-4 ${stage.color} pt-2 pb-2.5 mb-2 flex items-center justify-between border-b border-stone-200/70`}>
+                <div className="min-w-0">
+                  <h3 className="font-serif text-xs font-bold text-[#0C1929] truncate">
+                    {stage.label}
+                  </h3>
+                </div>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold shrink-0 ${stage.badgeBg}`}>
+                  {stageLeads.length}
+                </span>
+              </div>
+
+              {/* Cards Container */}
+              <div className="space-y-2.5 flex-1 overflow-y-auto max-h-[calc(100vh-280px)] pr-0.5">
+                {stageLeads.length === 0 ? (
+                  <div className="py-6 text-center text-[11px] text-stone-400 italic">
+                    No active leads
                   </div>
+                ) : (
+                  stageLeads.map((lead) => (
+                    <div
+                      key={lead.id}
+                      onClick={() => onSelectLead(lead)}
+                      className="bg-white p-3 rounded-xl border border-stone-200 shadow-xs hover:shadow-md hover:border-[#C5A059] transition-all cursor-pointer space-y-2 group"
+                    >
+                      <div className="flex justify-between items-start gap-1">
+                        <h4 className="font-serif text-xs font-bold text-[#0C1929] group-hover:text-[#9A7732] transition-colors leading-snug">
+                          {lead.clientName}
+                          {lead.partnerName && (
+                            <span className="block text-[10px] font-normal text-stone-500 truncate">
+                              &amp; {lead.partnerName}
+                            </span>
+                          )}
+                        </h4>
+                      </div>
+
+                      <div className="space-y-1 text-[10px] text-stone-600">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 text-[#9A7732] shrink-0" />
+                          <span className="truncate">{lead.eventDate}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Users className="w-3 h-3 text-stone-400 shrink-0" />
+                          <span>{lead.guestCount} Guests · {lead.eventType}</span>
+                        </div>
+                      </div>
+
+                      {/* Value & Actions */}
+                      <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
+                        <span className="font-mono text-[11px] font-bold text-[#0C1929]">
+                          ₹{((lead.quotationAmount || 2500000) / 100000).toFixed(1)}L
+                        </span>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCommunicationClick(lead);
+                            }}
+                            className="p-1 rounded-md hover:bg-emerald-50 text-emerald-700 transition-colors"
+                            title="Quick WhatsApp Concierge"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                          </button>
+                          
+                          {stage.id !== 'completed' && stage.id !== 'lost' && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleNextStage(e, lead)}
+                              className="p-1 rounded-md hover:bg-stone-100 text-stone-600 transition-colors"
+                              title="Advance to next stage"
+                            >
+                              <ArrowRight className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  ))
                 )}
               </div>
+
             </div>
           );
         })}

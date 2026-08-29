@@ -17,7 +17,8 @@ import {
   ArrowRight,
   Receipt,
   Circle,
-  Tag
+  Tag,
+  Download
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { FollowUp } from '../../types';
@@ -73,6 +74,32 @@ export const AdminDashboard: React.FC<{ onNewLeadClick: () => void }> = ({ onNew
     });
   };
 
+  const handleExportCSV = () => {
+    const headers = ['Client Name', 'Partner Name', 'Phone', 'Email', 'Event Type', 'Event Date', 'Guest Count', 'Status', 'Estimated Budget', 'Assigned Staff', 'Created At'];
+    const rows = leads.map(l => [
+      `"${l.clientName || ''}"`,
+      `"${l.partnerName || ''}"`,
+      `"${l.phone || ''}"`,
+      `"${l.email || ''}"`,
+      `"${l.eventType || ''}"`,
+      `"${l.eventDate || ''}"`,
+      `"${l.guestCount || ''}"`,
+      `"${l.status || ''}"`,
+      `"₹${(l.quotationAmount || 2500000).toLocaleString('en-IN')}"`,
+      `"${l.assignedStaff || ''}"`,
+      `"${l.createdAt || ''}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `arboretum_all_enquiries_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       
@@ -111,6 +138,15 @@ export const AdminDashboard: React.FC<{ onNewLeadClick: () => void }> = ({ onNew
           >
             <FileText className="w-4 h-4 text-[#C5A059]" />
             <span>Quote Builder</span>
+          </button>
+
+          <button
+            onClick={handleExportCSV}
+            title="Export all enquiry records to CSV"
+            className="px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold uppercase tracking-wider transition-colors flex items-center gap-2 border border-white/10"
+          >
+            <Download className="w-4 h-4 text-[#C5A059]" />
+            <span>Export CSV</span>
           </button>
 
           <button

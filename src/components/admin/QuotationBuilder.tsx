@@ -1,105 +1,146 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
 import { 
-  Printer, 
-  Send, 
+  FileText, 
   Plus, 
-  Trash2,
-  CheckCircle2,
-  MessageSquare
+  Trash2, 
+  Send, 
+  Printer, 
+  CheckCircle2, 
+  Sparkles, 
+  Download, 
+  Calendar, 
+  Users, 
+  MapPin, 
+  ArrowRight,
+  ShieldCheck,
+  Building,
+  DollarSign
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useApp } from '../../context/AppContext';
-import { Quotation, QuotationItem } from '../../types';
+import { Quotation, QuotationItem, EventCategory } from '../../types';
+import { PACKAGES } from '../../data/venueData';
+
+type SelectedTier = 'essential' | 'signature' | 'grand';
 
 export const QuotationBuilder: React.FC = () => {
-  const { 
-    leads, 
-    selectedLeadForQuotation, 
-    addQuotation, 
-    updateLeadStatus,
-    acceptQuotationAndConfirmBooking,
-    openCommunicationModal,
-    setAdminTab
-  } = useApp();
+  const { leads, quotations, addQuotation, updateLeadStatus, updateQuotation, confirmBookingFromQuote } = useApp();
 
-  // Selected Lead or custom client
-  const [selectedLeadId, setSelectedLeadId] = useState<string>(
-    selectedLeadForQuotation?.id || (leads[0]?.id || '')
-  );
-
-  const activeLead = leads.find(l => l.id === selectedLeadId) || leads[0];
-
-  // Quotation Config State
-  const [clientName, setClientName] = useState(activeLead?.clientName || 'Dr. Siddharth Rao & Ananya Krishnan');
-  const [clientEmail, setClientEmail] = useState(activeLead?.email || 'siddharth.ananya@example.com');
-  const [clientPhone, setClientPhone] = useState(activeLead?.phone || '+91 98401 23456');
-  const [eventDate, setEventDate] = useState(activeLead?.eventDate || '2026-11-20');
-  const [guestCount, setGuestCount] = useState(activeLead?.guestCount || 450);
-  const [packageTier, setPackageTier] = useState<'essential' | 'signature' | 'grand'>(
-    (activeLead?.packageInterest as any) || 'signature'
-  );
+  const [selectedLeadId, setSelectedLeadId] = useState<string>('');
+  const [selectedTier, setSelectedTier] = useState<SelectedTier>('signature');
+  const [guestCount, setGuestCount] = useState<number>(450);
+  const [discountPercent, setDiscountPercent] = useState<number>(5);
+  const [notes, setNotes] = useState<string>('Includes dedicated bridal concierge, valet parking management for 120 cars, and unmetered 250kVA silent backup generator.');
+  const [isGenerated, setIsGenerated] = useState<boolean>(false);
+  const [activeQuotation, setActiveQuotation] = useState<Quotation | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
 
   // Line items state
   const [items, setItems] = useState<QuotationItem[]>([
-    { name: 'Exclusive Venue Access: The Banyan Grand Lawn & Glasshouse', category: 'venue', unitPrice: 550000, quantity: 1, total: 550000 },
-    { name: 'Royal Heritage Banqueting (Grand Multi-Course Banquet & Live Counters)', category: 'catering', unitPrice: 3200, quantity: 450, total: 1440000 },
-    { name: 'Botanical Scenography, Fresh Floral Mandap & Ambient Tree Fairy Lights', category: 'decor', unitPrice: 380000, quantity: 1, total: 380000 },
-    { name: 'Intelligent Concert Lighting, L-Acoustics Sound & Rigging', category: 'production', unitPrice: 150000, quantity: 1, total: 150000 },
-    { name: 'Bridal Villa Suite & Groom Pavilion Full Day Day-Use Hospitality', category: 'hospitality', unitPrice: 65000, quantity: 1, total: 65000 },
-    { name: 'Valet Logistics, Security Marshals & Silent DG Power Backup', category: 'custom', unitPrice: 75000, quantity: 1, total: 75000 },
+    {
+      category: 'venue',
+      name: 'The Banyan Grand Lawn & Glasshouse Buyout',
+      description: 'Exclusive 24-hour estate access, bridal suites & amphitheater',
+      unitPrice: 1200000,
+      quantity: 1,
+      total: 1200000
+    },
+    {
+      category: 'catering',
+      name: 'Haute Coastal & Royal Indian Banqueting (Signature Tier)',
+      description: '4 live interactive counters, 12 starters, royal main course & desserts',
+      unitPrice: 3200,
+      quantity: 450,
+      total: 1440000
+    },
+    {
+      category: 'decor',
+      name: 'Bespoke Botanical Scenography & Fairy Lit Canopies',
+      description: 'Imported floral mandap, entrance archway, ambient mood lighting',
+      unitPrice: 450000,
+      quantity: 1,
+      total: 450000
+    },
+    {
+      category: 'production',
+      name: 'Concert Grade Acoustic & Intelligent Moving-Head Lighting',
+      description: 'Digital audio console, wireless microphones, architectural spot washes',
+      unitPrice: 180000,
+      quantity: 1,
+      total: 180000
+    }
   ]);
 
-  const [discountAmount, setDiscountAmount] = useState<number>(50000);
-  const taxRate = 0.18; // 18% GST
-
-  // Recalculate based on active lead changes
+  // Sync with selected lead
   useEffect(() => {
-    if (activeLead) {
-      setClientName(activeLead.partnerName ? `${activeLead.clientName} & ${activeLead.partnerName}` : activeLead.clientName);
-      setClientEmail(activeLead.email);
-      setClientPhone(activeLead.phone);
-      setEventDate(activeLead.eventDate);
-      setGuestCount(activeLead.guestCount);
-      if (activeLead.packageInterest && activeLead.packageInterest !== 'bespoke') {
-        setPackageTier(activeLead.packageInterest);
+    if (leads.length > 0 && !selectedLeadId) {
+      setSelectedLeadId(leads[0].id);
+    }
+  }, [leads, selectedLeadId]);
+
+  const currentLead = leads.find(l => l.id === selectedLeadId);
+
+  useEffect(() => {
+    if (currentLead) {
+      setGuestCount(currentLead.guestCount || 450);
+      if (currentLead.packageInterest && (currentLead.packageInterest === 'essential' || currentLead.packageInterest === 'signature' || currentLead.packageInterest === 'grand')) {
+        setSelectedTier(currentLead.packageInterest);
       }
     }
-  }, [activeLead]);
+  }, [currentLead]);
 
-  // Recalculate Catering Line when guest count or tier changes
-  const handlePackageChange = (tier: 'essential' | 'signature' | 'grand') => {
-    setPackageTier(tier);
-    const rate = tier === 'grand' ? 4500 : tier === 'signature' ? 3200 : 2200;
-    const baseVenue = tier === 'grand' ? 750000 : tier === 'signature' ? 550000 : 400000;
+  // Recalculate totals
+  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
+  const discountAmount = Math.round((subtotal * discountPercent) / 100);
+  const taxableAmount = subtotal - discountAmount;
+  const gstAmount = Math.round(taxableAmount * 0.18);
+  const grandTotal = taxableAmount + gstAmount;
+
+  // Handle tier change
+  const handleTierChange = (tier: SelectedTier) => {
+    setSelectedTier(tier);
+    const tierConfig = PACKAGES.find(p => p.id === tier);
+    const rate = tierConfig ? tierConfig.pricePerPlate : 3200;
+    const tierName = tier.charAt(0).toUpperCase() + tier.slice(1);
 
     setItems(prev => prev.map(item => {
       if (item.category === 'catering') {
-        return { ...item, unitPrice: rate, quantity: guestCount, total: rate * guestCount };
-      }
-      if (item.category === 'venue') {
-        return { ...item, unitPrice: baseVenue, total: baseVenue };
+        const newTotal = rate * guestCount;
+        return {
+          ...item,
+          name: `Haute Coastal & Royal Indian Banqueting (${tierName} Tier)`,
+          unitPrice: rate,
+          quantity: guestCount,
+          total: newTotal
+        };
       }
       return item;
     }));
   };
 
+  // Handle guest count change
   const handleGuestCountChange = (count: number) => {
     setGuestCount(count);
-    const rate = packageTier === 'grand' ? 4500 : packageTier === 'signature' ? 3200 : 2200;
+    const tierConfig = PACKAGES.find(p => p.id === selectedTier);
+    const rate = tierConfig ? tierConfig.pricePerPlate : 3200;
+
     setItems(prev => prev.map(item => {
       if (item.category === 'catering') {
-        return { ...item, quantity: count, total: rate * count };
+        return {
+          ...item,
+          quantity: count,
+          total: rate * count
+        };
       }
       return item;
     }));
   };
 
-  // Custom Item Addition
+  // Add line item
   const handleAddItem = () => {
     const newItem: QuotationItem = {
-      name: 'Custom Service / Production Add-on',
       category: 'custom',
+      name: 'Custom Service / Additional Decor Enhancement',
+      description: 'Bespoke client specification',
       unitPrice: 50000,
       quantity: 1,
       total: 50000
@@ -107,16 +148,18 @@ export const QuotationBuilder: React.FC = () => {
     setItems([...items, newItem]);
   };
 
+  // Remove line item
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, idx) => idx !== index));
   };
 
-  const handleItemChange = (index: number, field: keyof QuotationItem, val: any) => {
+  // Update item field
+  const handleUpdateItem = (index: number, field: keyof QuotationItem, value: any) => {
     setItems(items.map((item, idx) => {
       if (idx === index) {
-        const updated = { ...item, [field]: val };
+        const updated = { ...item, [field]: value };
         if (field === 'unitPrice' || field === 'quantity') {
-          updated.total = updated.unitPrice * updated.quantity;
+          updated.total = (Number(updated.unitPrice) || 0) * (Number(updated.quantity) || 0);
         }
         return updated;
       }
@@ -124,90 +167,40 @@ export const QuotationBuilder: React.FC = () => {
     }));
   };
 
-  // Calculations
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const taxableAmount = Math.max(0, subtotal - discountAmount);
-  const taxAmount = Math.round(taxableAmount * taxRate);
-  const grandTotal = taxableAmount + taxAmount;
+  // Save Quotation
+  const handleSaveQuotation = () => {
+    if (!currentLead) return;
 
-  // Actions
-  const handleSendQuote = () => {
     const newQuote: Quotation = {
-      id: `quote-${Date.now()}`,
-      quotationNumber: `ARB-Q-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      leadId: activeLead?.id || 'lead-custom',
-      clientName,
-      email: clientEmail,
-      phone: clientPhone,
-      eventType: activeLead?.eventType || 'wedding',
-      eventDate,
-      spaces: ['The Banyan Grand Lawn', 'The Glasshouse Conservatory'],
-      packageTier,
-      guestCount,
-      items,
-      subtotal,
-      discountAmount,
-      taxAmount,
+      id: `Q-${Date.now().toString().slice(-4)}`,
+      quotationNumber: `ARB-QT-2026-${Date.now().toString().slice(-4)}`,
+      leadId: currentLead.id,
+      clientName: currentLead.clientName,
+      partnerName: currentLead.partnerName,
+      email: currentLead.email,
+      phone: currentLead.phone,
+      eventType: currentLead.eventType,
+      eventDate: currentLead.eventDate,
+      spaces: currentLead.preferredSpaces || ['The Banyan Grand Lawn', 'The Emerald Glasshouse'],
+      packageTier: selectedTier,
+      guestCount: guestCount,
+      items: items,
+      subtotal: subtotal,
+      discountAmount: discountAmount,
+      taxAmount: gstAmount,
       totalAmount: grandTotal,
       advanceDeposit: Math.round(grandTotal * 0.4),
       status: 'sent',
-      validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       createdAt: new Date().toISOString().split('T')[0],
-      preparedBy: 'Vikram Sundaram (Senior Venue Director)',
-      specialTerms: 'Includes dedicated senior banquet marshal and tasting session for 6 guests.'
+      validUntil: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+      preparedBy: 'Vikram Sundaram (Senior Director)',
+      specialTerms: notes
     };
 
     addQuotation(newQuote);
-    if (activeLead) {
-      updateLeadStatus(activeLead.id, 'quotation_sent');
-    }
-
-    openCommunicationModal({
-      recipientName: clientName,
-      recipientPhone: clientPhone,
-      recipientEmail: clientEmail,
-      leadId: activeLead?.id,
-      defaultTemplate: 'quote_ready',
-      customMessage: `Namaste ${clientName},\n\nYour bespoke celebration proposal for The Arboretum @ ECR is now ready.\n\n📜 Quotation Ref: ${newQuote.quotationNumber}\n📅 Date: ${eventDate}\n👥 Scale: ${guestCount} Guests · ${packageTier.toUpperCase()} Collection\n💰 Total Outlay: ₹${(grandTotal / 100000).toFixed(2)} Lakhs (incl. 18% GST)\n💳 40% Advance Required: ₹${(Math.round(grandTotal * 0.4) / 100000).toFixed(2)} Lakhs\n\nPlease let us know if you would like to proceed with the auspicious reservation.\n\nWarm regards,\nVikram Sundaram | Senior Venue Director`
-    });
-
-    confetti({
-      particleCount: 50,
-      spread: 60,
-      origin: { y: 0.6 },
-      colors: ['#C5A059', '#0C1929', '#FAF8F5']
-    });
-  };
-
-  const handleConvertToBooking = () => {
-    const newQuote: Quotation = {
-      id: `quote-${Date.now()}`,
-      quotationNumber: `ARB-Q-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      leadId: activeLead?.id || 'lead-custom',
-      clientName,
-      email: clientEmail,
-      phone: clientPhone,
-      eventType: activeLead?.eventType || 'wedding',
-      eventDate,
-      spaces: ['The Banyan Grand Lawn', 'The Glasshouse Conservatory'],
-      packageTier,
-      guestCount,
-      items,
-      subtotal,
-      discountAmount,
-      taxAmount,
-      totalAmount: grandTotal,
-      advanceDeposit: Math.round(grandTotal * 0.4),
-      status: 'accepted',
-      validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      createdAt: new Date().toISOString().split('T')[0],
-      preparedBy: 'Vikram Sundaram (Senior Venue Director)',
-      specialTerms: 'Includes dedicated senior banquet marshal and tasting session for 6 guests.'
-    };
-
-    addQuotation(newQuote);
-    acceptQuotationAndConfirmBooking(newQuote.id);
-    setAdminTab('bookings');
+    setActiveQuotation(newQuote);
+    updateLeadStatus(currentLead.id, 'quotation_sent');
+    setIsGenerated(true);
   };
 
   const handlePrint = () => {
@@ -215,359 +208,448 @@ export const QuotationBuilder: React.FC = () => {
   };
 
   return (
-    <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-8">
+    <div className="p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
       
-      {/* Header bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-stone-200 shadow-xs">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-xs">
         <div>
-          <span className="text-[10px] uppercase tracking-[0.25em] text-[#9A7732] font-bold block mb-1">
-            Artisanal Quotation Engine
-          </span>
-          <h2 className="font-serif text-2xl sm:text-3xl text-[#0C1929] font-bold">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="w-2 h-2 rounded-full bg-[#C5A059]" />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-[#9A7732] font-bold">
+              Artisanal Quotation Engine
+            </span>
+          </div>
+          <h2 className="font-serif text-xl sm:text-3xl text-[#0C1929] font-bold">
             Bespoke Event Proposal Builder
           </h2>
-          <p className="text-stone-500 text-xs sm:text-sm font-light">
-            Live auto-calculating luxury document preview formatted with venue letterhead.
+          <p className="text-stone-600 text-xs sm:text-sm font-light mt-0.5">
+            Auto-calculating luxury document preview formatted with venue letterhead &amp; GST compliance.
           </p>
         </div>
 
-        {/* Lead Selector */}
-        <div className="flex items-center gap-3">
-          <label className="text-xs text-stone-500 uppercase tracking-wider font-semibold">
+        {/* Lead Selector Pill */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-[#FAF8F5] p-2 sm:p-3 rounded-2xl border border-stone-200">
+          <label className="text-[11px] font-mono text-stone-500 uppercase tracking-wider pl-1">
             Target Lead:
           </label>
           <select
             value={selectedLeadId}
             onChange={(e) => setSelectedLeadId(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-stone-50 border border-stone-300 text-xs font-semibold text-[#0C1929] focus:border-[#0C1929] focus:outline-none"
+            className="bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-[#0C1929] focus:outline-hidden cursor-pointer shadow-xs truncate max-w-full sm:max-w-xs"
           >
-            {leads.map(l => (
-              <option key={l.id} value={l.id}>
-                {l.clientName} ({l.eventType} · {l.eventDate})
+            {leads.map(lead => (
+              <option key={lead.id} value={lead.id}>
+                {lead.clientName} ({lead.eventType} · {lead.eventDate})
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Main 2-Column Split: Form Inputs & Elegant Letterhead Preview */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         
-        {/* Left 5 Cols: Configurator Controls */}
-        <div className="lg:col-span-5 space-y-6">
+        {/* Left Column: Line Items & Builder Controls (7 cols) */}
+        <div className="lg:col-span-7 space-y-6">
           
-          {/* Tier & Guest Count Card */}
-          <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-5">
-            <h4 className="font-serif text-lg text-[#0C1929] font-bold border-b border-stone-100 pb-3">
-              1. Package Tier &amp; Scale
-            </h4>
+          {/* Step 1: Package Tier & Scale */}
+          <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-xs space-y-4">
+            <h3 className="font-serif text-lg sm:text-xl text-[#0C1929] font-bold border-b border-stone-100 pb-3 flex items-center justify-between">
+              <span>1. Package Tier &amp; Scale</span>
+              <span className="text-xs font-mono font-normal text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md">
+                Step 1 of 3
+              </span>
+            </h3>
 
-            {/* Package selector pills */}
-            <div className="grid grid-cols-3 gap-2">
-              {(['essential', 'signature', 'grand'] as const).map((tier) => (
-                <button
-                  key={tier}
-                  type="button"
-                  onClick={() => handlePackageChange(tier)}
-                  className={`py-3 rounded-2xl text-xs font-semibold uppercase tracking-wider border transition-all ${
-                    packageTier === tier
-                      ? 'bg-[#0C1929] text-[#E6CA85] border-[#C5A059] shadow-md'
-                      : 'bg-stone-50 text-stone-700 border-stone-200 hover:border-stone-400'
-                  }`}
-                >
-                  <span className="block">{tier}</span>
-                  <span className="text-[10px] opacity-75 lowercase font-mono">
-                    ₹{tier === 'grand' ? '4500' : tier === 'signature' ? '3200' : '2200'}/p
-                  </span>
-                </button>
-              ))}
+            {/* 3 Tier Buttons */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              {(['essential', 'signature', 'grand'] as SelectedTier[]).map((tier) => {
+                const isSelected = selectedTier === tier;
+                const price = tier === 'essential' ? 2200 : tier === 'signature' ? 3200 : 4500;
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    onClick={() => handleTierChange(tier)}
+                    className={`p-2.5 sm:p-3.5 rounded-xl sm:rounded-2xl border text-center transition-all ${
+                      isSelected
+                        ? 'bg-[#0C1929] text-[#FAF8F5] border-[#C5A059] shadow-md ring-1 ring-[#C5A059]'
+                        : 'bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200'
+                    }`}
+                  >
+                    <span className="text-[10px] sm:text-xs uppercase tracking-wider font-bold block truncate">
+                      {tier}
+                    </span>
+                    <span className={`text-[10px] sm:text-xs font-mono mt-0.5 block ${isSelected ? 'text-[#E6CA85]' : 'text-stone-500'}`}>
+                      ₹{price}/p
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Guest Count Slider */}
-            <div>
-              <div className="flex justify-between text-xs text-stone-700 font-semibold mb-2">
-                <span className="uppercase tracking-wider">Guest Count</span>
-                <span className="text-[#9A7732] font-bold text-sm">{guestCount} Guests</span>
+            <div className="pt-2">
+              <div className="flex justify-between items-center text-xs font-medium mb-1.5">
+                <span className="text-stone-700 uppercase tracking-wider font-bold">Guest Count</span>
+                <span className="font-serif text-base sm:text-lg font-bold text-[#0C1929]">{guestCount} Guests</span>
               </div>
               <input
                 type="range"
                 min="100"
-                max="1200"
+                max="1500"
                 step="25"
                 value={guestCount}
-                onChange={(e) => handleGuestCountChange(parseInt(e.target.value, 10))}
-                className="w-full h-2 bg-stone-200 rounded-lg accent-[#0C1929] cursor-pointer"
+                onChange={(e) => handleGuestCountChange(Number(e.target.value))}
+                className="w-full accent-[#0C1929] cursor-pointer h-2 bg-stone-200 rounded-lg"
               />
-            </div>
-
-            {/* Date Input */}
-            <div>
-              <label className="block text-xs uppercase tracking-wider text-stone-700 font-bold mb-1">
-                Event Date
-              </label>
-              <input
-                type="date"
-                value={eventDate}
-                onChange={(e) => setEventDate(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-stone-50 border border-stone-300 text-xs font-serif focus:border-[#0C1929] focus:outline-none"
-              />
+              <div className="flex justify-between text-[10px] text-stone-500 font-mono mt-1">
+                <span>100 Intimate</span>
+                <span>500 Grand</span>
+                <span>1,500+ Mega Gala</span>
+              </div>
             </div>
           </div>
 
-          {/* Line Items Editor */}
-          <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-xs space-y-4">
+          {/* Step 2: Line Itemized Inclusions */}
+          <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h4 className="font-serif text-lg text-[#0C1929] font-bold">
-                2. Itemized Ledger Lines
-              </h4>
+              <div>
+                <h3 className="font-serif text-lg sm:text-xl text-[#0C1929] font-bold">
+                  2. Line-Item Customization
+                </h3>
+                <p className="text-stone-500 text-xs">Edit unit rates, quantities, or add custom event elements</p>
+              </div>
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="text-xs text-[#9A7732] font-bold hover:underline flex items-center gap-1 uppercase tracking-wider"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#0C1929] hover:bg-stone-900 text-white text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 transition-colors shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 text-[#C5A059]" />
                 <span>Add Item</span>
               </button>
             </div>
 
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+            {/* Items Stack */}
+            <div className="space-y-3">
               {items.map((item, idx) => (
-                <div key={idx} className="p-3.5 rounded-2xl bg-stone-50 border border-stone-200 text-xs space-y-2">
-                  <div className="flex items-center justify-between gap-2">
+                <div
+                  key={`item-${idx}`}
+                  className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-stone-50 border border-stone-200 space-y-2 hover:border-[#C5A059]/40 transition-colors"
+                >
+                  <div className="flex items-start justify-between gap-2">
                     <input
                       type="text"
                       value={item.name}
-                      onChange={(e) => handleItemChange(idx, 'name', e.target.value)}
-                      className="w-full font-medium bg-transparent border-b border-transparent hover:border-stone-300 focus:border-[#0C1929] focus:outline-none text-[#0C1929]"
+                      onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
+                      className="font-medium text-xs sm:text-sm text-[#0C1929] bg-transparent border-b border-transparent hover:border-stone-300 focus:border-[#C5A059] focus:outline-hidden w-full"
                     />
                     <button
+                      type="button"
                       onClick={() => handleRemoveItem(idx)}
-                      className="text-stone-400 hover:text-red-600 p-1 transition-colors"
+                      className="text-stone-400 hover:text-red-600 transition-colors p-1"
                       title="Remove Item"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2">
-                    <div>
-                      <span className="text-[9px] text-stone-500 block uppercase">Unit Price</span>
-                      <input
-                        type="number"
-                        value={item.unitPrice}
-                        onChange={(e) => handleItemChange(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1 rounded-lg bg-white border border-stone-300 font-mono text-[11px]"
-                      />
+                  <input
+                    type="text"
+                    value={item.description || ''}
+                    onChange={(e) => handleUpdateItem(idx, 'description', e.target.value)}
+                    placeholder="Short description..."
+                    className="text-[11px] text-stone-500 bg-transparent border-b border-transparent hover:border-stone-300 focus:border-[#C5A059] focus:outline-hidden w-full"
+                  />
+
+                  {/* Quantity x Unit Rate = Total */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-stone-200 text-xs">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-stone-500 font-mono">Qty:</span>
+                        <input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => handleUpdateItem(idx, 'quantity', Number(e.target.value))}
+                          className="w-16 sm:w-20 bg-white border border-stone-300 rounded-lg px-2 py-1 text-xs font-mono font-semibold"
+                        />
+                      </div>
+                      <span className="text-stone-400">×</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[10px] text-stone-500 font-mono">Rate:</span>
+                        <input
+                          type="number"
+                          value={item.unitPrice}
+                          onChange={(e) => handleUpdateItem(idx, 'unitPrice', Number(e.target.value))}
+                          className="w-20 sm:w-24 bg-white border border-stone-300 rounded-lg px-2 py-1 text-xs font-mono font-semibold"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[9px] text-stone-500 block uppercase">Qty</span>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleItemChange(idx, 'quantity', parseFloat(e.target.value) || 0)}
-                        className="w-full px-2 py-1 rounded-lg bg-white border border-stone-300 font-mono text-[11px]"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-stone-500 block uppercase">Line Total</span>
-                      <span className="font-semibold text-stone-800 font-mono block pt-1">
-                        ₹{(item.total / 100000).toFixed(2)}L
-                      </span>
+
+                    <div className="font-mono font-bold text-xs sm:text-sm text-[#0C1929]">
+                      ₹{item.total.toLocaleString('en-IN')}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Discount Adjustment */}
-            <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
-              <label className="text-xs uppercase tracking-wider text-stone-700 font-semibold">
-                Courtesy Gold Privilege Discount (₹):
-              </label>
-              <input
-                type="number"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
-                className="w-32 px-3 py-1.5 rounded-xl bg-stone-50 border border-stone-300 text-xs font-mono text-right"
-              />
+            {/* Discount & Special Terms */}
+            <div className="pt-3 border-t border-stone-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-stone-700 font-bold uppercase tracking-wider">
+                  Special Privilege Discount:
+                </span>
+                <select
+                  value={discountPercent}
+                  onChange={(e) => setDiscountPercent(Number(e.target.value))}
+                  className="bg-white border border-stone-300 rounded-xl px-3 py-1 text-xs font-bold text-emerald-800"
+                >
+                  <option value={0}>0% (Standard Tariff)</option>
+                  <option value={5}>5% (ECR Resident / Weekday)</option>
+                  <option value={10}>10% (Directorate Special)</option>
+                  <option value={15}>15% (Full Advance Settlement)</option>
+                </select>
+              </div>
+
+              <span className="text-xs font-mono text-emerald-700 font-semibold text-right">
+                - ₹{discountAmount.toLocaleString('en-IN')} Saved
+              </span>
             </div>
+
+          </div>
+
+          {/* Step 3: Terms & Executive Notes */}
+          <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-stone-200 shadow-xs space-y-3">
+            <h3 className="font-serif text-lg sm:text-xl text-[#0C1929] font-bold">
+              3. Special Directorate Inclusions &amp; Notes
+            </h3>
+            <textarea
+              rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full bg-stone-50 border border-stone-200 rounded-2xl p-3 text-xs text-stone-800 focus:outline-hidden focus:border-[#C5A059]"
+            />
+          </div>
+
+          {/* Action Trigger Buttons */}
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSaveQuotation}
+              className="w-full sm:w-auto flex-1 py-3.5 px-6 rounded-2xl bg-[#0C1929] hover:bg-stone-900 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-98"
+            >
+              <FileText className="w-4 h-4 text-[#C5A059]" />
+              <span>Generate Official Quotation</span>
+            </button>
+
+            {isGenerated && (
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="w-full sm:w-auto py-3.5 px-5 rounded-2xl border border-[#0C1929] hover:bg-stone-100 text-[#0C1929] font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all active:scale-98"
+              >
+                <Printer className="w-4 h-4 text-[#9A7732]" />
+                <span>Print / PDF</span>
+              </button>
+            )}
           </div>
 
         </div>
 
-        {/* Right 7 Cols: Signature Luxury Letterhead Preview */}
-        <div className="lg:col-span-7 space-y-4">
-          
-          {/* Printable Letterhead Document Box */}
-          <div className="bg-[#FAF8F5] text-[#0C1929] p-8 sm:p-10 rounded-3xl border border-stone-300 shadow-2xl space-y-8 relative overflow-hidden print:p-0 print:border-none print:shadow-none">
+        {/* Right Column: Live Luxury Document Letterhead Preview (5 cols) */}
+        <div className="lg:col-span-5 space-y-6">
+          <div className="bg-[#FAF8F5] border border-[#C5A059]/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xl space-y-5 text-[#0C1929] relative overflow-hidden">
             
-            {/* Top Letterhead Header */}
-            <div className="flex items-start justify-between border-b-2 border-[#0C1929] pb-6">
+            {/* Watermark Crest */}
+            <div className="absolute right-[-20px] top-[-20px] text-stone-200/40 font-serif text-9xl font-bold select-none pointer-events-none">
+              A
+            </div>
+
+            {/* Letterhead Top */}
+            <div className="border-b border-[#0C1929]/15 pb-4 flex justify-between items-start">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-7 h-7 rounded-full bg-[#0C1929] text-[#E6CA85] flex items-center justify-center font-serif font-bold text-xs">
-                    A
-                  </div>
-                  <span className="font-serif text-2xl tracking-[0.2em] uppercase font-bold text-[#0C1929]">
-                    The Arboretum
-                  </span>
-                </div>
-                <span className="text-[10px] tracking-[0.3em] uppercase text-[#9A7732] font-mono block font-semibold">
-                  East Coast Road · Pondicherry Sanctuary
+                <span className="font-serif text-base sm:text-lg font-bold tracking-wider uppercase block text-[#0C1929]">
+                  THE ARBORETUM @ ECR
                 </span>
-                <span className="text-[10px] text-stone-500 block mt-1">
-                  GSTIN: 33AAACT1423B1Z8 · celebrations@thearboretum-ecr.com
+                <span className="text-[9px] text-stone-600 block uppercase tracking-widest font-mono">
+                  Luxury Wedding &amp; Events Sanctuary · Pondicherry
                 </span>
               </div>
-
               <div className="text-right">
-                <span className="px-3 py-1 rounded-full bg-[#0C1929] text-[#E6CA85] text-[10px] font-mono font-bold uppercase tracking-widest block mb-1">
-                  Official Proposal
-                </span>
-                <span className="text-xs font-mono text-stone-500 block">
-                  REF: ARB-Q-2026-8841
-                </span>
-                <span className="text-xs text-stone-500 block">
-                  Date: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                <span className="text-[9px] font-mono uppercase bg-[#0C1929] text-[#E6CA85] px-2 py-0.5 rounded font-bold">
+                  CONFIDENTIAL
                 </span>
               </div>
             </div>
 
-            {/* Recipient Details & Event Overview */}
-            <div className="grid grid-cols-2 gap-6 text-xs border-b border-stone-200 pb-6">
+            {/* Proposal Details */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span className="text-[10px] uppercase tracking-widest text-[#9A7732] font-bold block mb-1">
-                  Prepared Exclusively For:
-                </span>
-                <h4 className="font-serif text-lg font-bold text-[#0C1929]">
-                  {clientName}
-                </h4>
-                <p className="text-stone-700 font-light mt-0.5">{clientEmail}</p>
-                <p className="text-stone-700 font-light">{clientPhone}</p>
+                <span className="text-[10px] text-stone-600 block uppercase font-mono">Client Details:</span>
+                <strong className="block text-xs font-bold">{currentLead?.clientName || 'Valued Patron'}</strong>
+                <span className="text-[11px] text-stone-600 block">{currentLead?.phone}</span>
+                <span className="text-[11px] text-stone-600 block truncate">{currentLead?.email}</span>
               </div>
-
               <div className="text-right">
-                <span className="text-[10px] uppercase tracking-widest text-[#9A7732] font-bold block mb-1">
-                  Event Parameters:
-                </span>
-                <span className="font-serif text-base font-semibold text-[#0C1929] block">
-                  {eventDate} (Prime Auspicious Slot)
-                </span>
-                <span className="text-stone-700 block">{guestCount} Valued Guests</span>
-                <span className="text-stone-700 uppercase tracking-wider font-semibold text-[10px]">
-                  Collection: {packageTier.toUpperCase()}
-                </span>
+                <span className="text-[10px] text-stone-600 block uppercase font-mono">Celebration:</span>
+                <strong className="block text-xs font-bold">{currentLead?.eventType || 'Grand Wedding'}</strong>
+                <span className="text-[11px] text-stone-600 block">{currentLead?.eventDate || 'Auspicious Date'}</span>
+                <span className="text-[11px] text-[#9A7732] font-semibold block">{guestCount} Guests · {selectedTier}</span>
               </div>
             </div>
 
-            {/* Line Items Table */}
-            <div>
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-stone-300 text-stone-700 uppercase tracking-wider text-[10px]">
-                    <th className="pb-2 font-bold">Experience Element</th>
-                    <th className="pb-2 font-bold text-center">Category</th>
-                    <th className="pb-2 font-bold text-right">Amount (₹)</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-200">
-                  {items.map((item, idx) => (
-                    <tr key={idx} className="py-2.5">
-                      <td className="py-2.5 font-medium text-stone-900">
-                        {item.name}
-                        {item.quantity > 1 && (
-                          <span className="text-[10px] text-stone-500 font-mono block">
-                            (₹{item.unitPrice.toLocaleString()} × {item.quantity} pax)
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2.5 text-center text-stone-500 text-[10px] uppercase">
-                        {item.category}
-                      </td>
-                      <td className="py-2.5 text-right font-mono font-semibold text-stone-900">
-                        ₹{item.total.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Calculations Summary Ledger */}
-            <div className="pt-4 border-t-2 border-[#0C1929] flex justify-end">
-              <div className="w-64 space-y-2 text-xs">
-                <div className="flex justify-between text-stone-700">
-                  <span>Subtotal Outlay:</span>
-                  <span className="font-mono">₹{subtotal.toLocaleString()}</span>
-                </div>
-
-                {discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-800 font-semibold">
-                    <span>Privilege Courtesy:</span>
-                    <span className="font-mono">-₹{discountAmount.toLocaleString()}</span>
+            {/* Line Items Mini Table */}
+            <div className="space-y-2 pt-2 border-t border-stone-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-600 font-mono block">
+                Schedule of Investment:
+              </span>
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                {items.map((item, idx) => (
+                  <div key={`summary-${idx}`} className="flex justify-between text-xs py-1 border-b border-stone-100">
+                    <span className="truncate max-w-[180px] sm:max-w-[220px] text-stone-800">{item.name}</span>
+                    <span className="font-mono font-semibold">₹{item.total.toLocaleString('en-IN')}</span>
                   </div>
-                )}
-
-                <div className="flex justify-between text-stone-700">
-                  <span>GST (18% Statutory):</span>
-                  <span className="font-mono">₹{taxAmount.toLocaleString()}</span>
-                </div>
-
-                <div className="flex justify-between font-serif text-lg font-bold text-[#0C1929] pt-2 border-t border-stone-300">
-                  <span>Grand Investment:</span>
-                  <span className="font-sans font-bold text-[#0C1929]">₹{grandTotal.toLocaleString()}</span>
-                </div>
+                ))}
               </div>
             </div>
 
-            {/* Footer Terms & Sign-off */}
-            <div className="pt-6 border-t border-stone-200 flex items-center justify-between text-[10px] text-stone-600">
-              <div className="space-y-1">
-                <span className="font-bold block text-stone-800">Terms &amp; Reservation Guarantee</span>
-                <span>• 40% Advance secures auspicious date on estate registry.</span>
-                <span className="block">• Proposal valid for 14 calendar days.</span>
+            {/* Financial Calculations */}
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-stone-200 space-y-1.5 text-xs">
+              <div className="flex justify-between text-stone-600">
+                <span>Subtotal Tariff:</span>
+                <span className="font-mono">₹{subtotal.toLocaleString('en-IN')}</span>
               </div>
 
-              <div className="text-right">
-                <div className="font-serif italic text-sm text-[#0C1929] font-bold">Vikram Sundaram</div>
-                <span className="text-[9px] uppercase tracking-wider block">Senior Venue Director</span>
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Privilege Rebate ({discountPercent}%):</span>
+                  <span className="font-mono">- ₹{discountAmount.toLocaleString('en-IN')}</span>
+                </div>
+              )}
+
+              <div className="flex justify-between text-stone-600">
+                <span>GST (18% Statutory):</span>
+                <span className="font-mono">+ ₹{gstAmount.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div className="pt-2 border-t border-stone-200 flex justify-between items-center">
+                <span className="font-bold uppercase tracking-wider text-xs sm:text-sm text-[#0C1929]">
+                  Total Contract Value:
+                </span>
+                <span className="font-serif text-lg sm:text-xl font-bold text-[#0C1929]">
+                  ₹{grandTotal.toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              <div className="pt-1.5 flex justify-between text-[11px] text-[#9A7732] font-semibold">
+                <span>Reservation Advance (40%):</span>
+                <span className="font-mono">₹{Math.round(grandTotal * 0.4).toLocaleString('en-IN')}</span>
               </div>
             </div>
 
-          </div>
+            {/* Terms Summary */}
+            <div className="text-[10px] text-stone-600 leading-relaxed border-t border-stone-200 pt-3">
+              <p>
+                * Valid for 14 calendar days. Date exclusivity is confirmed upon receipt of the 40% reservation advance. Balance 60% due 15 days prior to celebration.
+              </p>
+            </div>
 
-          {/* Action Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white rounded-2xl border border-stone-200 shadow-xs">
+            {/* Convert to Booking 1-Click Button */}
             <button
-              onClick={handlePrint}
-              className="px-4 py-2.5 rounded-full border border-stone-300 hover:border-stone-500 text-stone-700 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-colors"
+              type="button"
+              onClick={() => {
+                if (!activeQuotation && currentLead) {
+                  handleSaveQuotation();
+                }
+                setShowConfirmModal(true);
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-md transition-all active:scale-98"
             >
-              <Printer className="w-4 h-4 text-stone-500" />
-              <span>Print / PDF</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+              <span>Accept &amp; Convert to Confirmed Booking</span>
             </button>
 
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleSendQuote}
-                className="px-5 py-2.5 rounded-full bg-[#0C1929] hover:bg-[#14283F] text-white text-xs font-semibold uppercase tracking-wider flex items-center gap-2 transition-colors shadow-xs"
-              >
-                <Send className="w-3.5 h-3.5 text-[#E6CA85]" />
-                <span>Send to Client</span>
-              </button>
-
-              <button
-                onClick={handleConvertToBooking}
-                className="px-5 py-2.5 rounded-full bg-[#C5A059] hover:bg-[#D4AF37] text-[#0C1929] text-xs font-bold uppercase tracking-wider flex items-center gap-2 transition-colors shadow-xs"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Accept &amp; Book Event</span>
-              </button>
-            </div>
           </div>
-
         </div>
 
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && currentLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-8 max-w-md w-full border border-stone-200 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
+              <Sparkles className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h4 className="font-serif text-xl sm:text-2xl text-[#0C1929] font-bold">
+                Confirm Sanctuary Booking
+              </h4>
+              <p className="text-stone-600 text-xs sm:text-sm">
+                Lock date <strong>{currentLead.eventDate}</strong> for <strong>{currentLead.clientName}</strong>.
+              </p>
+            </div>
+
+            <div className="bg-stone-50 p-4 rounded-2xl border border-stone-200 text-xs space-y-1.5 font-mono">
+              <div className="flex justify-between">
+                <span>Contract Value:</span>
+                <strong>₹{grandTotal.toLocaleString('en-IN')}</strong>
+              </div>
+              <div className="flex justify-between text-emerald-700">
+                <span>Statutory 40% Advance:</span>
+                <strong>₹{Math.round(grandTotal * 0.4).toLocaleString('en-IN')}</strong>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-2.5 rounded-xl border border-stone-300 text-stone-700 text-xs font-semibold hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const quoteToUse: Quotation = activeQuotation || {
+                    id: `Q-${Date.now().toString().slice(-4)}`,
+                    quotationNumber: `ARB-QT-2026-${Date.now().toString().slice(-4)}`,
+                    leadId: currentLead.id,
+                    clientName: currentLead.clientName,
+                    partnerName: currentLead.partnerName,
+                    email: currentLead.email,
+                    phone: currentLead.phone,
+                    eventType: currentLead.eventType,
+                    eventDate: currentLead.eventDate,
+                    spaces: currentLead.preferredSpaces || ['The Banyan Grand Lawn', 'The Emerald Glasshouse'],
+                    packageTier: selectedTier,
+                    guestCount: guestCount,
+                    items: items,
+                    subtotal: subtotal,
+                    discountAmount: discountAmount,
+                    taxAmount: gstAmount,
+                    totalAmount: grandTotal,
+                    advanceDeposit: Math.round(grandTotal * 0.4),
+                    status: 'accepted',
+                    createdAt: new Date().toISOString().split('T')[0],
+                    validUntil: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+                    preparedBy: 'Vikram Sundaram (Senior Director)',
+                    specialTerms: notes
+                  };
+
+                  confirmBookingFromQuote(quoteToUse);
+                  setShowConfirmModal(false);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold uppercase tracking-wider"
+              >
+                Confirm &amp; Lock Date
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
